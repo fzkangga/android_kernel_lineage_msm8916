@@ -40,6 +40,27 @@ static int32_t msm_led_trigger_get_subdev_id(struct msm_led_flash_ctrl_t *fctrl,
 	return 0;
 }
 
+static int32_t msm_led_trigger_release(struct msm_led_flash_ctrl_t *fctrl)
+{
+	int rc = 0;
+	uint32_t i;
+
+	if (!fctrl) {
+		pr_err("failed\n");
+		return -EINVAL;
+	}
+
+	/* Flash off */
+	for (i = 0; i < fctrl->flash_num_sources; i++)
+		if (fctrl->flash_trigger[i])
+			led_trigger_event(fctrl->flash_trigger[i], 0);
+	/* Torch off */
+	for (i = 0; i < fctrl->torch_num_sources; i++)
+		if (fctrl->torch_trigger[i])
+			led_trigger_event(fctrl->torch_trigger[i], 0);
+	return rc;
+}
+
 static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 	void *data)
 {
@@ -128,16 +149,6 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 static const struct of_device_id msm_led_trigger_dt_match[] = {
 	{.compatible = "qcom,camera-led-flash"},
 	{}
-};
-
-MODULE_DEVICE_TABLE(of, msm_led_trigger_dt_match);
-
-static struct platform_driver msm_led_trigger_driver = {
-	.driver = {
-		.name = FLASH_NAME,
-		.owner = THIS_MODULE,
-		.of_match_table = msm_led_trigger_dt_match,
-	},
 };
 
 static int32_t msm_led_trigger_probe(struct platform_device *pdev)
@@ -309,16 +320,27 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 	return rc;
 }
 
+MODULE_DEVICE_TABLE(of, msm_led_trigger_dt_match);
+
+static struct platform_driver msm_led_trigger_driver = {
+	.probe = msm_led_trigger_probe,
+	.driver = {
+		.name = FLASH_NAME,
+		.owner = THIS_MODULE,
+		.of_match_table = msm_led_trigger_dt_match,
+	},
+};
+
 static int __init msm_led_trigger_add_driver(void)
 {
 	CDBG("called\n");
-	return platform_driver_probe(&msm_led_trigger_driver,
-		msm_led_trigger_probe);
+	return platform_driver_register(&msm_led_trigger_driver);
 }
 
 static struct msm_flash_fn_t msm_led_trigger_func_tbl = {
 	.flash_get_subdev_id = msm_led_trigger_get_subdev_id,
 	.flash_led_config = msm_led_trigger_config,
+	.flash_led_release = msm_led_trigger_release,
 };
 
 static struct msm_led_flash_ctrl_t fctrl = {
